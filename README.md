@@ -20,3 +20,5 @@ ln -s "$(pwd)/fastverse-skills/scientific-graphics-r" ~/.claude/skills/scientifi
 ```
 
 `fastverse-r` reuses guidance from `collapse-r`, so install both together.
+
+Alternatively, just give a Claude Code agent this repo's URL and ask it to install the skills globally.
