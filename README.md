@@ -1,6 +1,6 @@
 # fastverse skills
 
-Claude Code skills for the [collapse](https://sebkrantz.github.io/collapse/) and [fastverse](https://fastverse.github.io/fastverse/) R packages.
+Claude Code skills for the [collapse](https://fastverse.org/collapse/) and [fastverse](https://fastverse.org/fastverse/) R packages.
 
 - **collapse-r** — expert guidance for `collapse`. Stands alone.
 - **fastverse-r** — expert guidance for the fastverse (`data.table`, `collapse`, `kit`, `magrittr`). Requires the `collapse-r` skill.
