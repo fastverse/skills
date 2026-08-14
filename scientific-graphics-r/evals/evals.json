@@ -1,0 +1,26 @@
+{
+  "skill_name": "scientific-graphics-r",
+  "evals": [
+    {
+      "id": 0,
+      "name": "ggplot-stacked-bar-decomposition",
+      "prompt": "I've got value-chain decomposition data for African countries in country_rvc_terms.csv — columns are country, NDAVAX, REF, DDC, FVA, FDC (all in $M, ordered domestic to foreign). Make a publication-quality stacked bar chart in R showing the composition of these terms per country, with countries ordered by their total, and save it as a PDF I can drop into my paper.",
+      "files": ["data/country_rvc_terms.csv"],
+      "expected_output": "An R script + a vector PDF: stacked bars, countries ordered by total (factor order locked), pretty_plot()/theme_bw look with black panel border and long outward ticks, an ordered orange->blue term palette, percent or $-formatted y axis with ~7 breaks, bars anchored to the axis, vertical x labels."
+    },
+    {
+      "id": 1,
+      "name": "tmap-v4-choropleth-africa",
+      "prompt": "Make a choropleth map of Africa shaded by the rvc_share column in africa_indicator.csv (keyed by ISO3), in my usual figure style, saved as a PDF for the paper.",
+      "files": ["data/africa_indicator.csv"],
+      "expected_output": "An R script + PDF: an Africa choropleth using the tmap v4 API (fill=/fill.scale=tm_scale_*/fill.legend=tm_legend), jenks or continuous classification, an inferno/sequential palette, frame removed, legend inside the map, written via pdf()/print()/dev.off(). Geometry from a shapefile or rnaturalearth, joined on ISO3."
+    },
+    {
+      "id": 2,
+      "name": "pheatmap-region-sector",
+      "prompt": "I have a region-by-sector matrix of regional value chain values in rec_sector_matrix.csv (long format: REC, sector_code, value in $M, values span orders of magnitude). Make a heatmap of it for my paper, saved as a PDF.",
+      "files": ["data/rec_sector_matrix.csv"],
+      "expected_output": "An R script + PDF heatmap: reshaped to a REC x sector matrix, colour on a log scale (log10) but raw rounded values printed in the cells (display_numbers), no clustering, no colour-bar legend, YlOrRd ramp, black numbers, no cell borders."
+    }
+  ]
+}

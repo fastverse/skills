@@ -1,0 +1,73 @@
+{
+  "skill_name": "fastverse-r",
+  "evals": [
+    {
+      "id": 0,
+      "name": "grouped-rolling-volatility-panel",
+      "prompt": "I have a country-year panel in a data.table called `wdi` with columns ISO3, Year, PCGDP, INFL, and about 15 other indicators. Panel is unbalanced \u2014 not every country has every year. I need, per country: the growth rate of PCGDP, then a 10-year rolling median and rolling MAD of that growth rate and of INFL. Then keep only rows where both are non-missing. Write me the code and explain why you structured it that way.",
+      "expected_output": "Sorts by ISO3, Year first; uses fgrowth with g= and t= (so gaps are respected); uses frollmean/frollapply inside a grouped collapse pipeline (fgroup_by + fmutate + across) or a data.table by=; uses na_omit(cols=). Should NOT use dplyr, and should not roll across country boundaries.",
+      "files": [],
+      "assertions": [
+        "Sorts the panel by country and year before any rolling operation (roworder/setorder/order on ISO3, Year)",
+        "Passes the time variable to the growth function (t = Year) so gaps in the unbalanced panel are not differenced across",
+        "Groups the rolling computation by country so windows do not run across country boundaries",
+        "Uses data.table froll* functions (frollmean/frollapply/frollmedian) rather than zoo::rollapply or a hand-rolled loop",
+        "Uses collapse for the panel growth rate (fgrowth or fdiff) rather than a manual shift/lag division",
+        "Filters to non-missing rows using a vectorised call (na_omit with cols=, or an explicit !is.na filter) rather than complete.cases on the whole frame",
+        "Does not use the deprecated froll argument hasNA (has.nf is the current name)",
+        "Explains why sorting and/or passing t matters, not just what the code does"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Reviewing a colleague's script. Can you tell me if any of this is doing something slow or wrong, and rewrite it?\n\n```r\nlibrary(data.table)\nlibrary(collapse)\n\nfiles <- list.files(\"data/raw\", pattern = \".csv\", full.names = TRUE)\ndat <- rbindlist(lapply(files, fread))\n\ndat <- merge(dat, lookup, by = \"id\", all.x = TRUE)\ndat <- unique(dat)\n\nwide <- dcast(dat, id + year ~ sector, value.var = \"value\")\n\nsetDT(wide)\nres <- wide[, .(spread = max(value) - min(value)), by = region]\n\nwide$top <- ifelse(wide$score > 0, wide$score, -wide$score)\nbest <- wide[order(-score)][1:10]\n```",
+      "name": "code-review-mixed-idioms",
+      "expected_output": "Should flag: rbindlist -> rowbind(idcol=) losing the file provenance; merge -> join (sorting, no diagnostics); unique -> funique; dcast -> pivot; max(x)-min(x) in j disables GForce -> collapse fsummarise; ifelse -> fifelse/iif or abs(); order(-score)[1:10] -> topn or fslice. Should not just restyle without explaining.",
+      "files": [],
+      "assertions": [
+        "Flags that max(value) - min(value) inside j disables GForce and gives a faster alternative",
+        "Recommends collapse::join() over merge(), noting the diagnostics, validate, or that merge sorts/re-keys",
+        "Recommends collapse::pivot() over dcast()",
+        "Recommends collapse::funique() over unique()",
+        "Recommends collapse::rowbind() over rbindlist(), or notes the file provenance is lost without an idcol",
+        "Replaces ifelse() with a vectorised alternative (fifelse, iif, or abs())",
+        "Replaces order(-score)[1:10] with topn() or fslice(), noting the full sort is wasted",
+        "Notes that `value` and/or `region` do not exist in `wide` after the dcast, so those lines error",
+        "Points out that wide$top <- ... copies the whole table and uses := or set() instead",
+        "Provides a complete rewritten script, not only a list of comments"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "which-package-decision",
+      "prompt": "Quick question \u2014 I'm working with a 40M row data.table of trade flows (reporter, partner, product, year, value). For each of these, what should I actually use and why?\n\n1. adding a column that is value divided by the reporter-year total\n2. setting value to NA where a quality flag column equals 9\n3. the 20 largest flows in each year\n4. joining a 200k-row concordance table on product code\n5. a 3-year moving average of value within reporter-partner-product\n\nI have both collapse and data.table loaded and I never know which to reach for.",
+      "expected_output": "1. collapse fmutate/fsum TRA='/' (or settransform), 2. data.table d[flag == 9, value := NA] (conditional := is the one thing collapse lacks), 3. kit topn in i by year, or fslice(how='max'), 4. collapse join() with validate/verbose, 5. data.table frollmean inside a grouped collapse pipeline, sorted first. Should give a clear rule of thumb, not hedge.",
+      "files": [],
+      "assertions": [
+        "Item 1 (share of group total): recommends collapse, using fsum with TRA = '/' (or an equivalent single-pass TRA call) rather than a join-back or two-pass approach",
+        "Item 2 (conditional NA): recommends data.table's i-conditional := , and says collapse has no clean equivalent for a conditional update",
+        "Item 3 (top 20 per year): recommends kit::topn or collapse::fslice rather than order()/head() per group",
+        "Item 4 (join): recommends collapse::join over merge or X[Y], mentioning at least one of its diagnostics/validate/row-order advantages",
+        "Item 5 (moving average): recommends data.table frollmean, notes collapse has no rolling functions, and requires sorting/grouping so the window does not cross groups",
+        "Gives a general rule of thumb for choosing between the two packages rather than only answering the five items",
+        "Answers all five items"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "kit-rowwise-and-recode",
+      "prompt": "I have a POI dataset (data.table, ~8M rows) with columns: amenity, shop, office, tourism (all character, mostly NA \u2014 each row has exactly one of them filled), plus lon, lat, and a `category` column with about 30 distinct values that I need to collapse down to 6 sector labels using a mapping I have in a named list `sec_map` (names are the 6 sectors, values are character vectors of the original categories). I also want a count of how many of a set of 12 boolean flag columns are TRUE for each row. What's the fastest way to do all three?",
+      "expected_output": "pfirst(amenity, shop, office, tourism) for the coalesce; vswitch with unlist(sec_map)/rep(names(sec_map), lengths(sec_map)) and default = category for the recode; psum() or pcount(..., value = TRUE) over the flag columns via a collapse column selection. Should not use ifelse chains, case_when, apply, or rowSums.",
+      "assertions": [
+        "Uses a vectorised coalesce (kit::pfirst or data.table::fcoalesce) for the four sparse columns",
+        "Does NOT use nested ifelse/if_else/case_when chains or apply/Reduce for the coalesce",
+        "Uses vswitch or nswitch for the 30-to-6 category recode",
+        "Builds the vswitch lookup from the named list programmatically via unlist(sec_map) and rep(names(sec_map), lengths(sec_map)) rather than hand-writing 30 pairs",
+        "Passes default = category (or equivalent) so unmatched categories are preserved rather than becoming NA",
+        "Counts the TRUE flags with a row-wise kit function (psum or pcount(..., value = TRUE))",
+        "Does NOT use rowSums(as.matrix(...)) or apply(..., 1, sum) for the flag count",
+        "Assigns the three new columns by reference with := or set() rather than copying the 8M-row table"
+      ]
+    }
+  ]
+}

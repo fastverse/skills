@@ -1,0 +1,71 @@
+{
+  "skill_name": "collapse-r",
+  "notes": "All evals use datasets shipped with collapse (wlddev, GGDC10S) so runs are reproducible without external data. Scripts should be written to the output dir and actually executed with Rscript.",
+  "evals": [
+    {
+      "id": 0,
+      "name": "panel-shares-and-growth",
+      "prompt": "I'm working with the wlddev panel that ships with collapse (iso3c, year, region, income, PCGDP, LIFEEX, GINI, ODA, POP). Write me an R script that: (1) computes each country's share of its region's total POP in each year, (2) computes the population-weighted mean PCGDP and LIFEEX by region and decade, and (3) adds the annual growth rate of PCGDP per country. The panel has gaps so be careful. Save it as panel_analysis.R and run it so I can see the head of each result.",
+      "expected_output": "A runnable R script using fsum(POP, list(region, year), TRA = '/') for the share (no join), fmean(..., w = POP) grouped by region+decade, and fgrowth(PCGDP, g = iso3c, t = year) passing t because the panel is irregular. Should print heads.",
+      "files": [],
+      "expectations": [
+        "The script runs under Rscript without error and prints a head of each of the three results",
+        "The POP growth/share step passes t = year (or uses an indexed frame) so gaps in the panel are respected",
+        "The region-year POP share is computed with TRA = '/' rather than a separate aggregate + join",
+        "The regional means are population-weighted via the w = POP argument, not an unweighted mean",
+        "A decade variable is derived from year and used as a grouping column",
+        "Within each region-year, the computed POP shares sum to 1",
+        "No shorthand aliases (slt/sbt/gby/smr/mtt/tfm/gv/gvr/nv/av) appear in the script"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "dplyr-to-collapse-translation",
+      "prompt": "Can you rewrite this so it runs on collapse instead of dplyr? It's too slow on my 40M row table.\n\nlibrary(dplyr)\nres <- dat %>%\n  filter(!is.na(value)) %>%\n  group_by(country, sector) %>%\n  mutate(share = value / sum(value, na.rm = TRUE)) %>%\n  ungroup() %>%\n  group_by(country) %>%\n  summarise(across(c(value, share), ~ mean(.x, na.rm = TRUE)), n = n()) %>%\n  left_join(lookup, by = \"country\") %>%\n  arrange(desc(value))\n\nlookup has one row per country.",
+      "expected_output": "collapse translation using fsubset, TRA = '/' for the grouped share (no group_by needed for the mutate), fgroup_by + fsummarise with across(..., fmean) and GRPN()/n(), join(..., validate = '1:1'), roworder(-value). Should flag that across() takes no purrr lambdas and that join() takes only the first match by default, and should state whether it assumes namespace masking.",
+      "files": [],
+      "expectations": [
+        "The grouped share is computed with fsum(..., TRA = '/') (or fbetween/fwithin family) instead of fgroup_by + fmutate",
+        "The answer states which namespace convention it assumes (f-prefixed vs set_collapse masking) rather than silently mixing them",
+        "across() is used without purrr-style lambdas (no ~ .x), since collapse does not support them",
+        "Row ordering uses roworder(-value) rather than arrange() or order()",
+        "The lookup merge uses join() and addresses its non-dplyr defaults (multiple = FALSE and/or validate)",
+        "The group count uses GRPN()/n() or fnobs rather than dplyr::n()",
+        "The translation is verified to reproduce the dplyr result on synthetic data"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "reshape-join-table",
+      "prompt": "Using GGDC10S from collapse: I want a table with one row per Country and one column per sector (AGR through OTH) holding the average value added share of that sector in 2010-2018, ordered so the country with the largest AGR share is first, and I want it printed as a LaTeX booktabs table with the shares as percentages to 1 decimal. Write the script.",
+      "expected_output": "Uses fsubset on Variable == 'VA' and the year range, computes shares with fsum(..., TRA = '/') or proportions, aggregates with fmean, reshapes with pivot(how = 'wider'), orders with roworder(-AGR), and prints via xtable(..., booktabs = TRUE, include.rownames = FALSE). Sector column selection should use get_vars/gvr or a range, not tidyselect.",
+      "files": [],
+      "expectations": [
+        "The script runs under Rscript without error and writes table.tex",
+        "The long-to-wide reshape uses pivot(), not tapply/reshape/tidyr",
+        "Sector shares sum to approximately 100 per country",
+        "table.tex contains booktabs rules (\\toprule, \\midrule, \\bottomrule)",
+        "table.tex is printed without row names (include.rownames = FALSE)",
+        "Rows are ordered so the country with the largest AGR share appears first",
+        "Percentages are formatted to 1 decimal place"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "package-backend-function",
+      "prompt": "I'm writing an R package and want a function `group_summary(data, by, cols, w = NULL)` that returns, for each group, the weighted mean and the weighted median of the selected columns plus the group size \u2014 as fast as possible, no dplyr dependency. by and cols come in as character vectors from the user. What's the right way to write this with collapse?",
+      "expected_output": "Builds a GRP object once (needed because fmedian benefits from it), uses get_vars/ckmatch for validation, add_vars(g$groups, ...) rather than fgroup_by/fsummarise, uses use.g.names = FALSE, and warns against set_collapse(mask=) inside a package plus the need for on.exit() if other options are set. Should mention importFrom in NAMESPACE.",
+      "files": [],
+      "expectations": [
+        "A GRP object is constructed once and reused for both the weighted mean and the weighted median",
+        "The result is assembled from g$groups via add_vars (or equivalent) rather than going through fgroup_by/fsummarise wrappers",
+        "User-supplied column names are validated, ideally with ckmatch(), producing an informative error",
+        "The answer explicitly warns against calling set_collapse(mask=) inside a package",
+        "use.g.names = FALSE is passed to the statistical functions",
+        "Group sizes are taken from the GRP object (g$group.sizes / GRPN) rather than recomputed",
+        "The answer mentions importFrom/collapse:: for declaring the dependency in NAMESPACE",
+        "The function runs on wlddev with by=c('region','income'), cols=c('PCGDP','LIFEEX'), w='POP' without error"
+      ]
+    }
+  ]
+}
